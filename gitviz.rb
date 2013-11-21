@@ -1,19 +1,5 @@
 #!/usr/bin/ruby
 
-#private Dictionary<string, string> DecorateDictionary = new Dictionary<string, string>();
-#private List<List<string>> Nodes = new List<List<string>>();
-#    
-#    private string DotFilename = Directory.GetParent(Application.ExecutablePath) + @"\" + Application.ProductName + ".dot";
-#            private string PdfFilename = Directory.GetParent(Application.ExecutablePath) + @"\" + Application.ProductName + ".pdf";
-#                    private string LogFilename = Directory.GetParent(Application.ExecutablePath) + @"\" + Application.ProductName + ".log";
-#                            string RepositoryName;
-#
-#            string[] MergedColumns;
-#            string[] MergedParents;
-#
-#            Status("Getting git commit(s) ...");
-#            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --all --pretty=format:\"%h|%p|%d\"");
-
 git_repo = ARGV && ARGV[0] || "."
 nodes = []
 
@@ -25,149 +11,54 @@ def git(command)
     end
 end
 
-deco_map = {}
-
-Dir.chdir git_repo do
-    commits = git "log --all --pretty=format:\"%h|%p|%d\""
-    if commits.empty?
-        puts "Unable to get get branch or branch empty ..."
-    else
-        commits.each do |line| 
-            puts line
-#                File.AppendAllText(LogFilename, "[commit(s)]\r\n");
-#                File.AppendAllText(LogFilename, Result + "\r\n");
-#                string[] DecorateLines = Result.Split('\n');
-#                foreach (string DecorateLine in DecorateLines)
-#                {
-#                    MergedColumns = DecorateLine.Split('|');
-            cols = line.split('|')
-#                    if (!String.IsNullOrEmpty(MergedColumns[2]))
-#                    {
-#                        DecorateDictionary.Add(MergedColumns[0], MergedColumns[2]);
-#                    }
-            if cols[2]
-                deco_map[cols[0]] = cols[2]
-            end
-#                }
-#                Status("Processed " + DecorateDictionary.Count + " decorate(s) ...");
-#            }
-    end
-
-    puts deco_map
-#
-#            Status("Getting git ref branch(es) ...");
-#            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" for-each-ref --format=\"%(objectname:short)|%(refname:short)\" "); //refs/heads/
-    branches = git "for-each-ref --format=\"%(objectname:short)|%(refname:short)\" "
-#            if (String.IsNullOrEmpty(Result))
-#            {
-#                Status("Unable to get get branch or branch empty ...");
-#            }
-    if branches.empty?
-        puts "Unable to get get branch or branch empty ..."
-#            else
-    else
-#            {
-#                File.AppendAllText(LogFilename, "[ref branch(es)]\r\n");
-#                File.AppendAllText(LogFilename, Result + "\r\n");
-#                string[] RefLines = Result.Split('\n');
-#                foreach (string RefLine in RefLines)
-        branches.each do |line|
-#                {
-#                    if (!String.IsNullOrEmpty(RefLine))
-#                    {
-#                        string[] RefColumns = RefLine.Split('|');
-            refs = line.split('|')
-            puts "%s : %s" % refs
-#                        if (!RefColumns[1].ToLower().StartsWith("refs/tags"))
-#                        if (RefColumns[1].ToLower().Contains("master"))
-            if refs[1].include?("master")
-#                        {
-#                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + RefColumns[0]);
-                parents = git("log --reverse --first-parent --pretty=format:\"%h\" ")
-                parents << refs[0]
-                puts "Parent: #{parents}"
-#                            if (String.IsNullOrEmpty(Result))
-#                            {
-#                                Status("Unable to get commit(s) ...");
-#                            }
-#                            else
-#                            {
-#                                string[] HashLines = Result.Split('\n');
-#                                Nodes.Add(new List<string>());
-#                                foreach (string HashLine in HashLines)
-#                                {
-#                                    Nodes[Nodes.Count - 1].Add(HashLine);
-#                                }
-#                            }
-#                        }
-#                    }
-#                }
-            end
+def deco_map
+    commits = git "log --all --pretty=format:\"%h|%d\""
+    out = {}
+    commits.each do |line| 
+        hash, ref_names = line.split('|')
+        if ref_names
+            out[hash] = ref_names
         end
     end
-#                foreach (string RefLine in RefLines)
-#                {
-#                    if (!String.IsNullOrEmpty(RefLine))
-#                    {
-#                        string[] RefColumns = RefLine.Split('|');
-#                        if (!RefColumns[1].ToLower().StartsWith("refs/tags"))
-#                        if (!RefColumns[1].ToLower().Contains("master"))
-#                        {
-#                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + RefColumns[0]);
-#                            if (String.IsNullOrEmpty(Result))
-#                            {
-#                                Status("Unable to get commit(s) ...");
-#                            }
-#                            else
-#                            {
-#                                string[] HashLines = Result.Split('\n');
-#                                Nodes.Add(new List<string>());
-#                                foreach (string HashLine in HashLines)
-#                                {
-#                                    Nodes[Nodes.Count - 1].Add(HashLine);
-#                                }
-#                            }
-#                        }
-#                    }
-#                }
-#            }
-#
-#            Status("Getting git merged branch(es) ...");
-#            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --all --merges --pretty=format:\"%h|%p\"");
-#            if (String.IsNullOrEmpty(Result))
-#            {
-#                Status("Unable to get get branch or branch empty ...");
-#            }
-#            else
-#            {
-#                File.AppendAllText(LogFilename, "[merged branch(es)]\r\n");
-#                File.AppendAllText(LogFilename, Result + "\r\n");
-#                string[] MergedLines = Result.Split('\n');
-#                foreach (string MergedLine in MergedLines)
-#                {
-#                    MergedColumns = MergedLine.Split('|');
-#                    MergedParents = MergedColumns[1].Split(' ');
-#                    if (MergedParents.Length > 1)
-#                    {
-#                        for (int i = 1; i < MergedParents.Length; i++)
-#                        {
-#                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + MergedParents[i]);
-#                            if (String.IsNullOrEmpty(Result))
-#                            {
-#                                Status("Unable to get commit(s) ...");
-#                            }
-#                            else
-#                            {
-#                                string[] HashLines = Result.Split('\n');
-#                                Nodes.Add(new List<string>());
-#                                foreach (string HashLine in HashLines)
-#                                {
-#                                    Nodes[Nodes.Count - 1].Add(HashLine);
-#                                }
-#                                Nodes[Nodes.Count - 1].Add(MergedColumns[0]);
-#                            }
-#                        }
-#                    }
+    out
+end
+
+def get_master_lineage
+    branches = git("for-each-ref --format=\"%(objectname:short)|%(refname:short)\" ").map{|line| line.split('|')}
+
+    master = branches.find{|ref, name| name == "master"}
+    puts "Master: %s" % master[0]
+    lineage = git("log --reverse --first-parent --pretty=format:\"%h\" #{master[0]}")
+    puts "Parent: #{lineage}"
+    lineage
+end
+
+def merged_branches
+    lines = git("log --all --merges --pretty=format:\"%h|%p\"")
+    merged = lines.map do |line| 
+        merge, parents_list = line.split "|"
+        {merge: merge, parents: parents_list.split(" ")}
+    end
+    merged
+end
+
+Dir.chdir git_repo do
+    deco_map.each {|k,v| puts "%s: %s" % [k,v]}
+
+    master_lineage = get_master_lineage
+    nodes << master_lineage
+    merged = merged_branches
+
+    merged.each do |data|
+        puts "Cols: #{data[:merge]}; par: #{data[:parents]}"
+        data[:parents].each do |parent|
+            commits = git "log --reverse --first-parent --pretty=format:\"%h\" #{parent}"
+            puts "BLAH: " + commits.join(":")
+            nodes << commits
+        end
+    end
+    puts "All Nodes: #{nodes}"
+end
 #                }
 #            }
 #
@@ -255,5 +146,3 @@ Dir.chdir git_repo do
 #            Status("Done! ...");
 #        }
 #    }
-    end
-end
