@@ -15,6 +15,7 @@
 #            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --all --pretty=format:\"%h|%p|%d\"");
 
 git_repo = ARGV && ARGV[0] || "."
+nodes = []
 
 def git(command)
     IO::popen("git #{command}") do |io|
@@ -27,11 +28,11 @@ end
 deco_map = {}
 
 Dir.chdir git_repo do
-    res = git "log --all --pretty=format:\"%h|%p|%d\""
-    if !res
+    commits = git "log --all --pretty=format:\"%h|%p|%d\""
+    if commits.empty?
         puts "Unable to get get branch or branch empty ..."
     else
-        res.each do |line| 
+        commits.each do |line| 
             puts line
 #                File.AppendAllText(LogFilename, "[commit(s)]\r\n");
 #                File.AppendAllText(LogFilename, Result + "\r\n");
@@ -56,24 +57,35 @@ Dir.chdir git_repo do
 #
 #            Status("Getting git ref branch(es) ...");
 #            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" for-each-ref --format=\"%(objectname:short)|%(refname:short)\" "); //refs/heads/
+    branches = git "for-each-ref --format=\"%(objectname:short)|%(refname:short)\" "
 #            if (String.IsNullOrEmpty(Result))
 #            {
 #                Status("Unable to get get branch or branch empty ...");
 #            }
+    if branches.empty?
+        puts "Unable to get get branch or branch empty ..."
 #            else
+    else
 #            {
 #                File.AppendAllText(LogFilename, "[ref branch(es)]\r\n");
 #                File.AppendAllText(LogFilename, Result + "\r\n");
 #                string[] RefLines = Result.Split('\n');
 #                foreach (string RefLine in RefLines)
+        branches.each do |line|
 #                {
 #                    if (!String.IsNullOrEmpty(RefLine))
 #                    {
 #                        string[] RefColumns = RefLine.Split('|');
+            refs = line.split('|')
+            puts "%s : %s" % refs
 #                        if (!RefColumns[1].ToLower().StartsWith("refs/tags"))
 #                        if (RefColumns[1].ToLower().Contains("master"))
+            if refs[1].include?("master")
 #                        {
 #                            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --reverse --first-parent --pretty=format:\"%h\" " + RefColumns[0]);
+                parents = git("log --reverse --first-parent --pretty=format:\"%h\" ")
+                parents << refs[0]
+                puts "Parent: #{parents}"
 #                            if (String.IsNullOrEmpty(Result))
 #                            {
 #                                Status("Unable to get commit(s) ...");
@@ -90,6 +102,9 @@ Dir.chdir git_repo do
 #                        }
 #                    }
 #                }
+            end
+        end
+    end
 #                foreach (string RefLine in RefLines)
 #                {
 #                    if (!String.IsNullOrEmpty(RefLine))
