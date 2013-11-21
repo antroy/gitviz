@@ -1,10 +1,20 @@
 #!/usr/bin/ruby
 
+#private Dictionary<string, string> DecorateDictionary = new Dictionary<string, string>();
+#private List<List<string>> Nodes = new List<List<string>>();
+#    
+#    private string DotFilename = Directory.GetParent(Application.ExecutablePath) + @"\" + Application.ProductName + ".dot";
+#            private string PdfFilename = Directory.GetParent(Application.ExecutablePath) + @"\" + Application.ProductName + ".pdf";
+#                    private string LogFilename = Directory.GetParent(Application.ExecutablePath) + @"\" + Application.ProductName + ".log";
+#                            string RepositoryName;
+#
 #            string[] MergedColumns;
 #            string[] MergedParents;
 #
 #            Status("Getting git commit(s) ...");
 #            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" log --all --pretty=format:\"%h|%p|%d\"");
+
+git_repo = ARGV && ARGV[0] || "."
 
 def git(command)
     IO::popen("git #{command}") do |io|
@@ -14,26 +24,35 @@ def git(command)
     end
 end
 
+deco_map = {}
 
-res = git "log --all --pretty=format:\"%h|%p|%d\""
-if !res
-    puts "Unable to get get branch or branch empty ..."
-else
-    res.each {|line| puts line}
-end
+Dir.chdir git_repo do
+    res = git "log --all --pretty=format:\"%h|%p|%d\""
+    if !res
+        puts "Unable to get get branch or branch empty ..."
+    else
+        res.each do |line| 
+            puts line
 #                File.AppendAllText(LogFilename, "[commit(s)]\r\n");
 #                File.AppendAllText(LogFilename, Result + "\r\n");
 #                string[] DecorateLines = Result.Split('\n');
 #                foreach (string DecorateLine in DecorateLines)
 #                {
 #                    MergedColumns = DecorateLine.Split('|');
+            cols = line.split('|')
 #                    if (!String.IsNullOrEmpty(MergedColumns[2]))
 #                    {
 #                        DecorateDictionary.Add(MergedColumns[0], MergedColumns[2]);
 #                    }
+            if cols[2]
+                deco_map[cols[0]] = cols[2]
+            end
 #                }
 #                Status("Processed " + DecorateDictionary.Count + " decorate(s) ...");
 #            }
+    end
+
+    puts deco_map
 #
 #            Status("Getting git ref branch(es) ...");
 #            Result = Execute(Reg.Read("GitPath"), "--git-dir \"" + Reg.Read("GitRepositoryPath") + "\\.git\" for-each-ref --format=\"%(objectname:short)|%(refname:short)\" "); //refs/heads/
@@ -221,3 +240,5 @@ end
 #            Status("Done! ...");
 #        }
 #    }
+    end
+end
