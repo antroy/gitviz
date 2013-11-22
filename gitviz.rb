@@ -1,7 +1,8 @@
 #!/usr/bin/ruby
 
+require 'erb'
+
 git_repo = ARGV && ARGV[0] || "."
-nodes = []
 
 def git(command)
     IO::popen("git #{command}") do |io|
@@ -42,51 +43,50 @@ def merged_branches
     merged
 end
 
-Dir.chdir git_repo do
-    deco_map.each {|k,v| puts "%s: %s" % [k,v]}
+def get_nodes(git_repo)
+    Dir.chdir git_repo do
+        nodes = []
+        deco_map.each {|k,v| puts "%s: %s" % [k,v]}
 
-    master_lineage = get_master_lineage
-    nodes << master_lineage
-    merged = merged_branches
+        master_lineage = get_master_lineage
+        nodes << master_lineage
+        merged = merged_branches
 
-    merged.each do |data|
-        puts "Cols: #{data[:merge]}; par: #{data[:parents]}"
-        data[:parents].each do |parent|
-            commits = git "log --reverse --first-parent --pretty=format:\"%h\" #{parent}"
-            puts "BLAH: " + commits.join(":")
-            nodes << commits
+        merged.each do |data|
+            puts "Cols: #{data[:merge]}; par: #{data[:parents]}"
+            data[:parents].each do |parent|
+                commits = git "log --reverse --first-parent --pretty=format:\"%h\" #{parent}"
+                puts "BLAH: " + commits.join(":")
+                nodes << commits
+            end
         end
+        puts "All Nodes: #{nodes}"
+        nodes
     end
-    puts "All Nodes: #{nodes}"
 end
-#                }
-#            }
-#
-#            Status("Processed " + Nodes.Count + " branch(es) ...");
-#
-#            StringBuilder DotStringBuilder = new StringBuilder();
-#            Status("Generating dot file ...");
-#            DotStringBuilder.Append("strict digraph \"" + RepositoryName + "\" {\r\n");
-#            //DotStringBuilder.Append("  splines=line;\r\n");
-#            for (int i = 0; i < Nodes.Count; i++)
-#            {
-#                DotStringBuilder.Append("  node[group=\"" + (i + 1) + "\"];\r\n");
-#                DotStringBuilder.Append("  ");
-#                for (int j = 0; j < Nodes[i].Count; j++)
-#                {
-#                    DotStringBuilder.Append("\"" + Nodes[i][j] + "\"");
-#                    if (j < Nodes[i].Count - 1)
-#                    {
-#                        DotStringBuilder.Append(" -> ");
-#                    }
-#                    else
-#                    {
-#                        DotStringBuilder.Append(";");
-#                    }
-#                }
-#                DotStringBuilder.Append("\r\n");
-#            }
-#
+
+def dot_graph(git_repo)
+    nodes = get_nodes git_repo
+
+    graph_templ = "
+    strict digraph bob {
+        splines=line;
+        <% nodes.each_with_index do |branch, i| %>
+        node[group=<%= i %>]
+        <%= branch.join(' -> ') %>;
+        <% end %>
+
+
+    }
+    "
+
+    templ = ERB.new graph_templ
+
+    puts templ.result binding
+end
+
+dot_graph git_repo
+
 #            int DecorateCount = 0;
 #            foreach(KeyValuePair<string, string> DecorateKeyValuePair in DecorateDictionary)
 #            {
