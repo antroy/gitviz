@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 
 require 'erb'
+require 'tempfile'
 
 git_repo = ARGV && ARGV[0] || "."
 
@@ -28,9 +29,7 @@ def get_master_lineage
     branches = git("for-each-ref --format=\"%(objectname:short)|%(refname:short)\" ").map{|line| line.split('|')}
 
     master = branches.find{|ref, name| name == "master"}
-    puts "Master: %s" % master[0]
     lineage = git("log --reverse --first-parent --pretty=format:\"%h\" #{master[0]}")
-    puts "Parent: #{lineage}"
     lineage
 end
 
@@ -44,105 +43,80 @@ def merged_branches
 end
 
 def get_nodes(git_repo)
-    Dir.chdir git_repo do
-        nodes = []
-        deco_map.each {|k,v| puts "%s: %s" % [k,v]}
+    nodes = []
 
-        master_lineage = get_master_lineage
-        nodes << master_lineage
-        merged = merged_branches
+    master_lineage = get_master_lineage
+    nodes << master_lineage
+    merged = merged_branches
 
-        merged.each do |data|
-            puts "Cols: #{data[:merge]}; par: #{data[:parents]}"
-            data[:parents].each do |parent|
-                commits = git "log --reverse --first-parent --pretty=format:\"%h\" #{parent}"
-                puts "BLAH: " + commits.join(":")
-                nodes << commits
-            end
+    merged.each do |data|
+        data[:parents].each do |parent|
+            commits = git "log --reverse --first-parent --pretty=format:\"%h\" #{parent}"
+            nodes << commits
         end
-        puts "All Nodes: #{nodes}"
-        nodes
     end
+    nodes
 end
 
 def dot_graph(git_repo)
     nodes = get_nodes git_repo
 
-    graph_templ = "
+    graph_templ = <<EOF
     strict digraph bob {
         splines=line;
         <% nodes.each_with_index do |branch, i| %>
         node[group=<%= i %>]
-        <%= branch.join(' -> ') %>;
+        <% quoted_branch = branch.map{|br| "\\"%s\\"" % br} %>
+        <%= quoted_branch.join(' -> ') %>;
+        <% end %>
+
+        <% deco_map.each do |k,v| %>
+        subgraph "<%= k %>" {
+            rank="same"
+            <% fill_colour = v.include?("tag:") ? "#ffffdd" : "#ddddff" %>
+            "<%= v.strip %>" [shape="box", style="filled", fillcolor="<%= fill_colour %>"];
+            "<%= v.strip %>" -> "<%= k %>"  [weight=0, arrowtype="none", dirtype="none", arrowhead="none", style="dotted"];
+        }
         <% end %>
 
 
     }
-    "
+EOF
 
     templ = ERB.new graph_templ
 
-    puts templ.result binding
+    dotfile = File.new "/tmp/dotfile.dot", "w"
+    begin
+        dotfile.write(templ.result(binding))
+        png_file = "/tmp/pngfile.svg"
+
+        IO::popen("dot -Tsvg #{dotfile.path} -o #{png_file}")
+        png_file
+    ensure
+        dotfile.close
+    end
 end
 
-dot_graph git_repo
+def display_png(png_file)
+    require 'tk'
 
-#            int DecorateCount = 0;
-#            foreach(KeyValuePair<string, string> DecorateKeyValuePair in DecorateDictionary)
-#            {
-#                DecorateCount++;
-#                DotStringBuilder.Append("  subgraph Decorate" + DecorateCount + "\r\n");
-#                DotStringBuilder.Append("  {\r\n");
-#                DotStringBuilder.Append("    rank=\"same\";\r\n");
-#                if (DecorateKeyValuePair.Value.Trim().Substring(0, 5) == "(tag:")
-#                {
-#                    DotStringBuilder.Append("    \"" + DecorateKeyValuePair.Value.Trim() + "\" [shape=\"box\", style=\"filled\", fillcolor=\"#ffffdd\"];\r\n");
-#                }
-#                else
-#                {
-#                    DotStringBuilder.Append("    \"" + DecorateKeyValuePair.Value.Trim() + "\" [shape=\"box\", style=\"filled\", fillcolor=\"#ddddff\"];\r\n");
-#                }
-#                DotStringBuilder.Append("    \"" + DecorateKeyValuePair.Value.Trim() + "\" -> \"" + DecorateKeyValuePair.Key + "\" [weight=0, arrowtype=\"none\", dirtype=\"none\", arrowhead=\"none\", style=\"dotted\"];\r\n");
-#                DotStringBuilder.Append("  }\r\n");
-#            }
-#
-#            DotStringBuilder.Append("}\r\n");
-#            File.WriteAllText(@DotFilename, DotStringBuilder.ToString());
-#
-#            Status("Generating version tree ...");
-#            Process DotProcess = new Process();
-#            DotProcess.StartInfo.UseShellExecute = false;
-#            DotProcess.StartInfo.CreateNoWindow = true;
-#            DotProcess.StartInfo.RedirectStandardOutput = true;
-#            DotProcess.StartInfo.FileName = GraphvizDotPathTextBox.Text;
-#            DotProcess.StartInfo.Arguments = "\"" + @DotFilename + "\" -Tpdf -Gsize=10,10 -o\"" + @PdfFilename + "\"";
-#            DotProcess.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-#            DotProcess.Start();
-#            DotProcess.WaitForExit();
-#
-#            DotProcess.StartInfo.Arguments = "\"" + @DotFilename + "\" -Tps -o\"" + @PdfFilename.Replace(".pdf", ".ps") + "\"";
-#            DotProcess.Start();
-#            DotProcess.WaitForExit();
-#            if (DotProcess.ExitCode == 0)
-#            {
-#                if (File.Exists(@PdfFilename))
-#                {
-##if (!DEBUG)
-#                    /*
-#                    Process ViewPdfProcess = new Process();
-#                    ViewPdfProcess.StartInfo.FileName = @PdfFilename;
-#                    ViewPdfProcess.Start();
-#                    //ViewPdfProcess.WaitForExit();
-#                    //Close();
-#                    */
-##endif
-#                }
-#            }
-#            else
-#            {
-#                Status("Version tree generation failed ...");
-#            }
-#
-#            Status("Done! ...");
-#        }
-#    }
+    $resultsVar = TkVariable.new
+    root = TkRoot.new
+    root.title = "RepoNameHere"
+
+    image = TkPhotoImage.new
+    image.file = png_file
+
+    label = TkLabel.new(root) 
+    label.image = image
+    label.place('height' => image.height, 
+                'width' => image.width, 
+                'x' => 10, 'y' => 10)
+    Tk.mainloop
+end
+
+Dir.chdir git_repo do
+    png_name = dot_graph git_repo
+    puts "open #{png_name}"
+end
+
